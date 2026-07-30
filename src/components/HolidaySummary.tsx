@@ -8,7 +8,6 @@ interface HolidaySummaryProps {
   onManage: () => void;
   onCancel: () => void;
   onSave: () => void;
-  onDeleteSelected: () => void;
 }
 
 export function HolidaySummary({
@@ -19,7 +18,6 @@ export function HolidaySummary({
   onManage,
   onCancel,
   onSave,
-  onDeleteSelected,
 }: HolidaySummaryProps) {
   const count = isManaging ? draftCount : holidays.length;
   const title = isManaging ? "Select holiday dates" : `${count} holidays this month`;
@@ -60,13 +58,6 @@ export function HolidaySummary({
           </div>
         ) : selectedHoliday ? (
           <div className="grid flex-none gap-1.5">
-            <button
-              type="button"
-              onClick={onDeleteSelected}
-              className="min-h-8 rounded-lg border border-[#efb4ad] bg-white px-2.5 text-[0.68rem] font-black text-[#b9342d] transition hover:-translate-y-px active:translate-y-px active:scale-[0.98]"
-            >
-              Delete
-            </button>
             <button
               type="button"
               onClick={onManage}

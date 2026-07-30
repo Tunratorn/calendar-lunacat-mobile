@@ -1,13 +1,14 @@
 import { MenuIcon } from "./icons";
 
 interface TopBarProps {
+  title: string;
   onOpenMenu: () => void;
   onOpenProfile: () => void;
 }
 
-export function TopBar({ onOpenMenu, onOpenProfile }: TopBarProps) {
+export function TopBar({ title, onOpenMenu, onOpenProfile }: TopBarProps) {
   return (
-    <header className="flex items-center justify-between gap-4 px-5 pb-3 pt-7">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 bg-canvas/94 px-5 pb-3 pt-7 backdrop-blur-md">
       <button
         type="button"
         aria-label="Open menu"
@@ -17,7 +18,7 @@ export function TopBar({ onOpenMenu, onOpenProfile }: TopBarProps) {
         <MenuIcon />
       </button>
       <div>
-        <h1 className="text-[1.36rem] font-semibold leading-tight text-ink">My Calendar</h1>
+        <h1 className="text-[1.36rem] font-semibold leading-tight text-ink">{title}</h1>
       </div>
       <button
         type="button"

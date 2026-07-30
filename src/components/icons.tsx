@@ -58,6 +58,38 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function RefreshIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" {...props}>
+      <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6" />
+    </svg>
+  );
+}
+
+export function EditIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" {...props}>
+      <path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" />
+    </svg>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" {...props}>
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
+  );
+}
+
+export function ProductIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" {...props}>
+      <path d="M6 7h12l-1 13H7zM9 7a3 3 0 0 1 6 0M9 11h.01M15 11h.01" />
+    </svg>
+  );
+}
+
 export function BarsIcon(props: IconProps) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" {...props}>

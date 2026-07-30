@@ -1,5 +1,5 @@
 import type { View } from "../types";
-import { CalendarNavIcon, CheckIcon, BarsIcon } from "./icons";
+import { CalendarNavIcon, ProductIcon, BarsIcon } from "./icons";
 
 interface BottomNavProps {
   activeView: View;
@@ -8,7 +8,7 @@ interface BottomNavProps {
 
 const navItems: { view: View; label: string; icon: typeof CalendarNavIcon }[] = [
   { view: "calendar", label: "Calendar", icon: CalendarNavIcon },
-  { view: "tasks", label: "Tasks", icon: CheckIcon },
+  { view: "product", label: "Product", icon: ProductIcon },
   { view: "stats", label: "Stats", icon: BarsIcon },
 ];
 
@@ -16,7 +16,7 @@ export function BottomNav({ activeView, onSelectView }: BottomNavProps) {
   return (
     <nav
       aria-label="Primary"
-      className="sticky bottom-0 mx-5 mb-5 flex items-center justify-around gap-2 rounded-3xl border border-ink/8 bg-white/94 p-2 shadow-[0_18px_44px_rgba(22,32,51,0.18)] backdrop-blur-md"
+      className="absolute inset-x-5 bottom-5 z-40 flex items-center justify-around gap-2 rounded-3xl border border-ink/8 bg-white/94 p-2 shadow-[0_18px_44px_rgba(22,32,51,0.18)] backdrop-blur-md"
     >
       {navItems.map(({ view, label, icon: Icon }) => {
         const isActive = activeView === view;

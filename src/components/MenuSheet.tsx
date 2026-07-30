@@ -17,7 +17,7 @@ const rows: { category: Category; label: string; description: string }[] = [
 
 export function MenuSheet({ open, onClose, onSelectCategory, onResetMockData }: MenuSheetProps) {
   return (
-    <Sheet open={open} onClose={onClose} kicker="Menu" title="My Calendars" titleId="info-title">
+    <Sheet open={open} onClose={onClose} kicker="Menu" title="My Calendars" titleId="info-title" variant="top">
       <div className="grid gap-3">
         {rows.map((row) => (
           <button

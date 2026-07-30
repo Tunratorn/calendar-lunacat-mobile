@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import type { CalendarEvent, Category, EventDraft, Filter, Holiday, View } from "./types";
+import { useMemo, useRef, useState } from "react";
+import type { CalendarEvent, Category, EventDraft, Filter, Holiday, MoneyDraft, MoneyEntry, View } from "./types";
 import { mockEvents } from "./data/mockEvents";
 import { useEvents } from "./hooks/useEvents";
 import { useHolidays } from "./hooks/useHolidays";
+import { useMoneyEntries } from "./hooks/useMoneyEntries";
 import { fromDateKey, toDateKey } from "./lib/date";
 import { TopBar } from "./components/TopBar";
 import { DateHero } from "./components/DateHero";
@@ -14,17 +15,22 @@ import { EventFormSheet } from "./components/EventFormSheet";
 import { EventDetailSheet } from "./components/EventDetailSheet";
 import { MenuSheet } from "./components/MenuSheet";
 import { ProfileSheet } from "./components/ProfileSheet";
-import { TasksSheet } from "./components/TasksSheet";
+import { ProductPage } from "./components/ProductPage";
 import { StatsSheet } from "./components/StatsSheet";
 import { HolidaySummary } from "./components/HolidaySummary";
+import { MoneySection } from "./components/MoneySection";
+import { MoneyFormSheet } from "./components/MoneyFormSheet";
+import { RefreshIcon } from "./components/icons";
 
-const today = new Date(2026, 6, 8);
+const today = new Date();
 
-type InfoSheetKind = "menu" | "profile" | "tasks" | "stats" | "detail" | null;
+type InfoSheetKind = "menu" | "profile" | "stats" | "detail" | null;
 
 export default function App() {
+  const appShellRef = useRef<HTMLDivElement>(null);
   const { events, setEvents, resetEvents } = useEvents(mockEvents);
   const { holidays, setHolidays } = useHolidays();
+  const { moneyEntries, setMoneyEntries } = useMoneyEntries();
 
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(toDateKey(today));
@@ -35,6 +41,9 @@ export default function App() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [eventFormError, setEventFormError] = useState("");
+  const [moneyFormOpen, setMoneyFormOpen] = useState(false);
+  const [editingMoneyEntry, setEditingMoneyEntry] = useState<MoneyEntry | null>(null);
 
   const [infoSheet, setInfoSheet] = useState<InfoSheetKind>(null);
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
@@ -75,6 +84,51 @@ export default function App() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [holidays, visibleMonth]);
 
+  const dayMoneyEntries = useMemo(() => {
+    return moneyEntries.filter((entry) => entry.date === selectedDay);
+  }, [moneyEntries, selectedDay]);
+
+  const dayMoneySummary = useMemo(() => {
+    return dayMoneyEntries.reduce(
+      (summary, entry) => {
+        if (entry.type === "income") {
+          summary.income += entry.amount;
+        } else {
+          summary.expense += entry.amount;
+        }
+
+        summary.balance = summary.income - summary.expense;
+        return summary;
+      },
+      { income: 0, expense: 0, balance: 0 },
+    );
+  }, [dayMoneyEntries]);
+
+  const monthMoneySummary = useMemo(() => {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+
+    return moneyEntries.reduce(
+      (summary, entry) => {
+        const date = fromDateKey(entry.date);
+
+        if (date.getFullYear() !== year || date.getMonth() !== month) {
+          return summary;
+        }
+
+        if (entry.type === "income") {
+          summary.income += entry.amount;
+        } else {
+          summary.expense += entry.amount;
+        }
+
+        summary.balance = summary.income - summary.expense;
+        return summary;
+      },
+      { income: 0, expense: 0, balance: 0 },
+    );
+  }, [moneyEntries, visibleMonth]);
+
   function goToDay(dateKey: string, date: Date) {
     setSelectedDay(dateKey);
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
@@ -87,6 +141,13 @@ export default function App() {
     setSelectedDay(toDateKey(next));
   }
 
+  function selectVisibleMonth(year: number, month: number) {
+    cancelHolidaySelection();
+    const next = new Date(year, month, 1);
+    setVisibleMonth(next);
+    setSelectedDay(toDateKey(next));
+  }
+
   function goToToday() {
     cancelHolidaySelection();
     setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -95,18 +156,36 @@ export default function App() {
 
   function openCreateSheet() {
     setEditingEvent(null);
+    setEventFormError("");
     setFormOpen(true);
   }
 
   function openEditSheet(event: CalendarEvent) {
     setInfoSheet(null);
     setEditingEvent(event);
+    setEventFormError("");
     setFormOpen(true);
   }
 
   function closeFormSheet() {
     setFormOpen(false);
     setEditingEvent(null);
+    setEventFormError("");
+  }
+
+  function openCreateMoneySheet() {
+    setEditingMoneyEntry(null);
+    setMoneyFormOpen(true);
+  }
+
+  function openEditMoneySheet(entry: MoneyEntry) {
+    setEditingMoneyEntry(entry);
+    setMoneyFormOpen(true);
+  }
+
+  function closeMoneyFormSheet() {
+    setMoneyFormOpen(false);
+    setEditingMoneyEntry(null);
   }
 
   function openHolidayManager() {
@@ -120,6 +199,22 @@ export default function App() {
   }
 
   function saveEvent(draft: EventDraft) {
+    const eventDate = editingEvent?.date ?? selectedDay;
+    const duplicateStartEvent = events.find((event) => {
+      if (event.date !== eventDate || event.id === editingEvent?.id) {
+        return false;
+      }
+
+      return event.start === draft.start;
+    });
+
+    if (duplicateStartEvent) {
+      setEventFormError(`Start time already used by ${duplicateStartEvent.title} (${duplicateStartEvent.start}).`);
+      return;
+    }
+
+    setEventFormError("");
+
     if (editingEvent) {
       setEvents((prev) =>
         prev.map((item) => (item.id === editingEvent.id ? { ...item, ...draft } : item)),
@@ -184,12 +279,32 @@ export default function App() {
     cancelHolidaySelection();
   }
 
-  function deleteSelectedHoliday() {
-    if (!selectedHoliday || !window.confirm("Delete this holiday?")) {
+  function saveMoneyEntry(draft: MoneyDraft) {
+    if (editingMoneyEntry) {
+      setMoneyEntries((prev) =>
+        prev.map((entry) => (entry.id === editingMoneyEntry.id ? { ...entry, ...draft } : entry)),
+      );
+    } else {
+      setMoneyEntries((prev) => [
+        ...prev,
+        {
+          id: `money-${Date.now()}`,
+          date: selectedDay,
+          ...draft,
+        },
+      ]);
+    }
+
+    closeMoneyFormSheet();
+  }
+
+  function deleteMoneyEntry(id: string) {
+    if (!window.confirm("Delete this money entry?")) {
       return;
     }
 
-    setHolidays((prev) => prev.filter((holiday) => holiday.id !== selectedHoliday.id));
+    setMoneyEntries((prev) => prev.filter((entry) => entry.id !== id));
+    closeMoneyFormSheet();
   }
 
   function openEventDetail(event: CalendarEvent) {
@@ -215,79 +330,125 @@ export default function App() {
 
   function openNavView(view: View) {
     setActiveView(view);
+    setDetailEvent(null);
+    setInfoSheet(view === "stats" ? "stats" : null);
+    appShellRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
-    if (view === "tasks" || view === "stats") {
-      setInfoSheet(view);
+    if (view !== "calendar") {
+      cancelHolidaySelection();
     }
   }
 
   const sectionRefreshKey = `${selectedDay}|${activeFilter}|${visibleMonth.getTime()}`;
+  const pageTitleByView: Record<View, string> = {
+    calendar: "My Calendar",
+    product: "Products",
+    stats: "Stats",
+  };
 
   return (
     <main aria-label="Lunacat calendar app" className="grid min-h-screen place-items-center p-5 max-[460px]:block max-[460px]:p-0">
-      <section className="no-scrollbar relative h-[min(880px,calc(100vh-40px))] min-h-190 w-[min(100%,420px)] overflow-y-auto overflow-x-hidden rounded-[36px] border border-ink/10 bg-canvas shadow-[0_24px_70px_rgba(22,32,51,0.16)] max-[460px]:h-screen max-[460px]:min-h-screen max-[460px]:w-full max-[460px]:rounded-none max-[460px]:border-0">
-        <TopBar onOpenMenu={() => setInfoSheet("menu")} onOpenProfile={() => setInfoSheet("profile")} />
-
-        <div key={sectionRefreshKey} className="animate-section-refresh">
-          <DateHero
-            date={fromDateKey(selectedDay)}
-            eventCount={dayEvents.length}
-            holidayTitle={selectedHoliday?.title}
-            onOpenCreateSheet={openCreateSheet}
+      <section className="relative h-[min(880px,calc(100vh-40px))] min-h-190 w-[min(100%,420px)] overflow-hidden rounded-[36px] border border-ink/10 bg-canvas shadow-[0_24px_70px_rgba(22,32,51,0.16)] max-[460px]:h-screen max-[460px]:min-h-screen max-[460px]:w-full max-[460px]:rounded-none max-[460px]:border-0">
+        <div ref={appShellRef} className="no-scrollbar h-full overflow-y-auto overflow-x-hidden pb-24">
+          <TopBar
+            title={pageTitleByView[activeView]}
+            onOpenMenu={() => setInfoSheet("menu")}
+            onOpenProfile={() => setInfoSheet("profile")}
           />
 
-          <HolidaySummary
-            holidays={monthHolidays}
-            selectedHoliday={selectedHoliday}
-            isManaging={holidaySelectionMode}
-            draftCount={draftHolidayDates.size}
-            onManage={openHolidayManager}
-            onCancel={cancelHolidaySelection}
-            onSave={saveHolidaySelection}
-            onDeleteSelected={deleteSelectedHoliday}
-          />
+          {activeView === "product" ? (
+            <ProductPage />
+          ) : (
+            <div key={sectionRefreshKey} className="animate-section-refresh">
+              <DateHero
+                date={fromDateKey(selectedDay)}
+                eventCount={dayEvents.length}
+                holidayTitle={selectedHoliday?.title}
+                onOpenCreateSheet={openCreateSheet}
+              />
 
-          <MonthSwitcher
-            visibleMonth={visibleMonth}
-            onPrevMonth={() => shiftMonth(-1)}
-            onNextMonth={() => shiftMonth(1)}
-          />
+              <HolidaySummary
+                holidays={monthHolidays}
+                selectedHoliday={selectedHoliday}
+                isManaging={holidaySelectionMode}
+                draftCount={draftHolidayDates.size}
+                onManage={openHolidayManager}
+                onCancel={cancelHolidaySelection}
+                onSave={saveHolidaySelection}
+              />
 
-          <CalendarGrid
-            visibleMonth={visibleMonth}
-            selectedDay={selectedDay}
-            getEventCount={(dateKey) => eventCountByDate.get(dateKey) ?? 0}
-            getHolidayTitle={(dateKey) => holidayByDate.get(dateKey)?.title}
-            holidaySelectionMode={holidaySelectionMode}
-            isHolidayDraftSelected={(dateKey) => draftHolidayDates.has(dateKey)}
-            onSelectDay={goToDay}
-            onToggleHolidayDate={toggleHolidayDate}
-          />
+              <MonthSwitcher
+                visibleMonth={visibleMonth}
+                onPrevMonth={() => shiftMonth(-1)}
+                onNextMonth={() => shiftMonth(1)}
+                onSelectMonth={selectVisibleMonth}
+                onGoToCurrent={goToToday}
+              />
 
-          <section aria-labelledby="agenda-title" className="px-5 pt-3 pb-26">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="mb-0.5 text-xs font-bold uppercase text-muted">Schedule</p>
-                <h2 id="agenda-title" className="text-xl font-semibold text-ink">
-                  Upcoming
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={goToToday}
-                className="border-0 bg-transparent font-extrabold text-accent"
-              >
-                Today
-              </button>
+              <CalendarGrid
+                visibleMonth={visibleMonth}
+                selectedDay={selectedDay}
+                getEventCount={(dateKey) => eventCountByDate.get(dateKey) ?? 0}
+                getHolidayTitle={(dateKey) => holidayByDate.get(dateKey)?.title}
+                holidaySelectionMode={holidaySelectionMode}
+                isHolidayDraftSelected={(dateKey) => draftHolidayDates.has(dateKey)}
+                onSelectDay={goToDay}
+                onToggleHolidayDate={toggleHolidayDate}
+              />
+
+              <section aria-labelledby="agenda-title" className="px-5 pt-3 pb-5">
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="mb-0.5 text-xs font-bold uppercase text-muted">Schedule</p>
+                    <h2 id="agenda-title" className="text-xl font-semibold text-ink">
+                      Pipeline for {fromDateKey(selectedDay).toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={goToToday}
+                    className="flex items-center gap-1.5 border-0 bg-transparent font-extrabold text-accent [&_svg]:h-4 [&_svg]:w-4"
+                  >
+                    <RefreshIcon />
+                    Today
+                  </button>
+                </div>
+                <AgendaList events={dayEvents} onOpenEvent={openEventDetail} />
+              </section>
+
+              <MoneySection
+                entries={dayMoneyEntries}
+                income={dayMoneySummary.income}
+                expense={dayMoneySummary.expense}
+                balance={dayMoneySummary.balance}
+                monthIncome={monthMoneySummary.income}
+                monthExpense={monthMoneySummary.expense}
+                monthBalance={monthMoneySummary.balance}
+                onOpenCreate={openCreateMoneySheet}
+                onOpenEntry={openEditMoneySheet}
+              />
             </div>
-            <AgendaList events={dayEvents} onOpenEvent={openEventDetail} />
-          </section>
+          )}
         </div>
 
         <BottomNav activeView={activeView} onSelectView={openNavView} />
       </section>
 
-      <EventFormSheet open={formOpen} editingEvent={editingEvent} onClose={closeFormSheet} onSave={saveEvent} />
+      <EventFormSheet
+        open={formOpen}
+        editingEvent={editingEvent}
+        submitError={eventFormError}
+        onClose={closeFormSheet}
+        onSave={saveEvent}
+      />
+
+      <MoneyFormSheet
+        open={moneyFormOpen}
+        editingEntry={editingMoneyEntry}
+        onClose={closeMoneyFormSheet}
+        onDelete={deleteMoneyEntry}
+        onSave={saveMoneyEntry}
+      />
 
       <EventDetailSheet
         open={infoSheet === "detail"}
@@ -305,7 +466,6 @@ export default function App() {
       />
 
       <ProfileSheet open={infoSheet === "profile"} onClose={closeInfoSheet} />
-      <TasksSheet open={infoSheet === "tasks"} onClose={closeInfoSheet} />
       <StatsSheet open={infoSheet === "stats"} onClose={closeInfoSheet} />
     </main>
   );

@@ -7,11 +7,13 @@ interface SheetProps {
   kicker: string;
   title: string;
   titleId: string;
+  variant?: "bottom" | "top";
   children: ReactNode;
 }
 
-export function Sheet({ open, onClose, kicker, title, titleId, children }: SheetProps) {
+export function Sheet({ open, onClose, kicker, title, titleId, variant = "bottom", children }: SheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const isTopSheet = variant === "top";
 
   useEffect(() => {
     if (!open) {
@@ -36,7 +38,10 @@ export function Sheet({ open, onClose, kicker, title, titleId, children }: Sheet
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-end justify-center bg-ink/36 p-5 animate-backdrop-in"
+      className={[
+        "fixed inset-0 z-50 flex justify-center bg-ink/36 px-5 animate-backdrop-in max-[460px]:px-0",
+        isTopSheet ? "items-start pb-10 pt-0" : "items-end pb-0 pt-10",
+      ].join(" ")}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -47,7 +52,12 @@ export function Sheet({ open, onClose, kicker, title, titleId, children }: Sheet
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="max-h-[min(86vh,720px)] w-full max-w-[420px] overflow-auto rounded-t-[28px] rounded-b-3xl bg-surface p-5 pt-3 shadow-[0_24px_70px_rgba(22,32,51,0.16)] animate-sheet-in"
+        className={[
+          "max-h-[min(88vh,740px)] w-full max-w-[420px] overflow-auto bg-surface p-5 shadow-[0_-18px_55px_rgba(22,32,51,0.18)]",
+          isTopSheet
+            ? "rounded-b-[28px] pt-5 animate-sheet-down"
+            : "rounded-t-[28px] pt-3 animate-sheet-in",
+        ].join(" ")}
       >
         <div className="mb-4 h-1.25 w-11 rounded-full bg-line" aria-hidden="true" />
         <div className="mb-3 flex items-center justify-between gap-4">
