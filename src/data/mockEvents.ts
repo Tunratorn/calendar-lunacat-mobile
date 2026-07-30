@@ -1,0 +1,58 @@
+import type { CalendarEvent } from "../types";
+
+export const mockEvents: CalendarEvent[] = [
+  {
+    id: "evt-1",
+    date: "2026-07-08",
+    start: "09:00",
+    end: "09:45",
+    title: "Design review",
+    note: "Mobile calendar layout pass",
+    category: "work",
+  },
+  {
+    id: "evt-2",
+    date: "2026-07-08",
+    start: "12:30",
+    end: "13:30",
+    title: "Lunch with Mina",
+    note: "Samyan Mitrtown, floor 4",
+    category: "personal",
+  },
+  {
+    id: "evt-3",
+    date: "2026-07-08",
+    start: "15:00",
+    end: "17:00",
+    title: "Deep work",
+    note: "Prototype event reminders",
+    category: "focus",
+  },
+  {
+    id: "evt-4",
+    date: "2026-07-11",
+    start: "10:00",
+    end: "11:15",
+    title: "Sprint planning",
+    note: "Prioritize calendar interactions",
+    category: "work",
+  },
+  {
+    id: "evt-5",
+    date: "2026-07-15",
+    start: "18:30",
+    end: "19:30",
+    title: "Gym session",
+    note: "Strength training",
+    category: "personal",
+  },
+  {
+    id: "evt-6",
+    date: "2026-08-03",
+    start: "14:00",
+    end: "15:00",
+    title: "Reminder QA",
+    note: "Check push notification copy",
+    category: "work",
+  },
+];
