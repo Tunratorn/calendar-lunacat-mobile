@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import type { CalendarEvent, Category, EventDraft, Filter, View } from "./types";
+import type { CalendarEvent, Category, EventDraft, Filter, Holiday, View } from "./types";
 import { mockEvents } from "./data/mockEvents";
 import { useEvents } from "./hooks/useEvents";
+import { useHolidays } from "./hooks/useHolidays";
 import { fromDateKey, toDateKey } from "./lib/date";
 import { TopBar } from "./components/TopBar";
 import { DateHero } from "./components/DateHero";
@@ -15,6 +16,7 @@ import { MenuSheet } from "./components/MenuSheet";
 import { ProfileSheet } from "./components/ProfileSheet";
 import { TasksSheet } from "./components/TasksSheet";
 import { StatsSheet } from "./components/StatsSheet";
+import { HolidaySummary } from "./components/HolidaySummary";
 
 const today = new Date(2026, 6, 8);
 
@@ -22,11 +24,14 @@ type InfoSheetKind = "menu" | "profile" | "tasks" | "stats" | "detail" | null;
 
 export default function App() {
   const { events, setEvents, resetEvents } = useEvents(mockEvents);
+  const { holidays, setHolidays } = useHolidays();
 
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(toDateKey(today));
   const [activeFilter, setActiveFilter] = useState<Filter>("all");
   const [activeView, setActiveView] = useState<View>("calendar");
+  const [holidaySelectionMode, setHolidaySelectionMode] = useState(false);
+  const [draftHolidayDates, setDraftHolidayDates] = useState<Set<string>>(() => new Set());
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
@@ -48,18 +53,42 @@ export default function App() {
     return counts;
   }, [events]);
 
+  const holidayByDate = useMemo(() => {
+    const byDate = new Map<string, Holiday>();
+    holidays.forEach((holiday) => {
+      byDate.set(holiday.date, holiday);
+    });
+    return byDate;
+  }, [holidays]);
+
+  const selectedHoliday = holidayByDate.get(selectedDay) ?? null;
+
+  const monthHolidays = useMemo(() => {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+
+    return holidays
+      .filter((holiday) => {
+        const date = fromDateKey(holiday.date);
+        return date.getFullYear() === year && date.getMonth() === month;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [holidays, visibleMonth]);
+
   function goToDay(dateKey: string, date: Date) {
     setSelectedDay(dateKey);
     setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
   }
 
   function shiftMonth(offset: number) {
+    cancelHolidaySelection();
     const next = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1);
     setVisibleMonth(next);
     setSelectedDay(toDateKey(next));
   }
 
   function goToToday() {
+    cancelHolidaySelection();
     setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     setSelectedDay(toDateKey(today));
   }
@@ -78,6 +107,16 @@ export default function App() {
   function closeFormSheet() {
     setFormOpen(false);
     setEditingEvent(null);
+  }
+
+  function openHolidayManager() {
+    setDraftHolidayDates(new Set(monthHolidays.map((holiday) => holiday.date)));
+    setHolidaySelectionMode(true);
+  }
+
+  function cancelHolidaySelection() {
+    setHolidaySelectionMode(false);
+    setDraftHolidayDates(new Set());
   }
 
   function saveEvent(draft: EventDraft) {
@@ -107,6 +146,50 @@ export default function App() {
 
     setEvents((prev) => prev.filter((item) => item.id !== id));
     closeInfoSheet();
+  }
+
+  function toggleHolidayDate(dateKey: string) {
+    setDraftHolidayDates((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+
+      return next;
+    });
+  }
+
+  function saveHolidaySelection() {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+    const draftDates = Array.from(draftHolidayDates).sort();
+
+    setHolidays((prev) => {
+      const otherMonthHolidays = prev.filter((holiday) => {
+        const date = fromDateKey(holiday.date);
+        return date.getFullYear() !== year || date.getMonth() !== month;
+      });
+
+      const nextMonthHolidays = draftDates.map((dateKey) => {
+        const existing = prev.find((holiday) => holiday.date === dateKey);
+        return existing ?? { id: `hol-${dateKey}`, date: dateKey, title: "Holiday" };
+      });
+
+      return [...otherMonthHolidays, ...nextMonthHolidays];
+    });
+
+    cancelHolidaySelection();
+  }
+
+  function deleteSelectedHoliday() {
+    if (!selectedHoliday || !window.confirm("Delete this holiday?")) {
+      return;
+    }
+
+    setHolidays((prev) => prev.filter((holiday) => holiday.id !== selectedHoliday.id));
   }
 
   function openEventDetail(event: CalendarEvent) {
@@ -149,7 +232,19 @@ export default function App() {
           <DateHero
             date={fromDateKey(selectedDay)}
             eventCount={dayEvents.length}
+            holidayTitle={selectedHoliday?.title}
             onOpenCreateSheet={openCreateSheet}
+          />
+
+          <HolidaySummary
+            holidays={monthHolidays}
+            selectedHoliday={selectedHoliday}
+            isManaging={holidaySelectionMode}
+            draftCount={draftHolidayDates.size}
+            onManage={openHolidayManager}
+            onCancel={cancelHolidaySelection}
+            onSave={saveHolidaySelection}
+            onDeleteSelected={deleteSelectedHoliday}
           />
 
           <MonthSwitcher
@@ -162,7 +257,11 @@ export default function App() {
             visibleMonth={visibleMonth}
             selectedDay={selectedDay}
             getEventCount={(dateKey) => eventCountByDate.get(dateKey) ?? 0}
+            getHolidayTitle={(dateKey) => holidayByDate.get(dateKey)?.title}
+            holidaySelectionMode={holidaySelectionMode}
+            isHolidayDraftSelected={(dateKey) => draftHolidayDates.has(dateKey)}
             onSelectDay={goToDay}
+            onToggleHolidayDate={toggleHolidayDate}
           />
 
           <section aria-labelledby="agenda-title" className="px-5 pt-3 pb-26">

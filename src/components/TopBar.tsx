@@ -17,7 +17,6 @@ export function TopBar({ onOpenMenu, onOpenProfile }: TopBarProps) {
         <MenuIcon />
       </button>
       <div>
-        <p className="mb-0.5 text-xs font-bold uppercase text-muted">Today</p>
         <h1 className="text-[1.36rem] font-semibold leading-tight text-ink">My Calendar</h1>
       </div>
       <button

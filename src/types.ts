@@ -20,3 +20,13 @@ export interface EventDraft {
   end: string;
   note: string;
 }
+
+export interface Holiday {
+  id: string;
+  date: string;
+  title: string;
+}
+
+export interface HolidayDraft {
+  title: string;
+}
