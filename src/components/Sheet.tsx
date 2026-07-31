@@ -13,7 +13,12 @@ interface SheetProps {
 
 export function Sheet({ open, onClose, kicker, title, titleId, variant = "bottom", children }: SheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
   const isTopSheet = variant === "top";
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -24,13 +29,13 @@ export function Sheet({ open, onClose, kicker, title, titleId, variant = "bottom
 
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
       }
     }
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) {
     return null;
