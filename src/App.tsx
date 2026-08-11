@@ -27,9 +27,9 @@ type InfoSheetKind = "menu" | "profile" | "detail" | null;
 
 export default function App() {
   const appShellRef = useRef<HTMLDivElement>(null);
-  const { events, setEvents, resetEvents } = useEvents(mockEvents);
-  const { holidays, setHolidays } = useHolidays();
-  const { moneyEntries, setMoneyEntries } = useMoneyEntries();
+  const { events, createEvent, updateEvent, deleteEvent: removeEvent, resetEvents } = useEvents(mockEvents);
+  const { holidays, replaceHolidays } = useHolidays();
+  const { moneyEntries, createMoneyEntry, updateMoneyEntry, deleteMoneyEntry: removeMoneyEntry } = useMoneyEntries();
 
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(toDateKey(today));
@@ -197,7 +197,7 @@ export default function App() {
     setDraftHolidayDates(new Set());
   }
 
-  function saveEvent(draft: EventDraft) {
+  async function saveEvent(draft: EventDraft) {
     const eventDate = editingEvent?.date ?? selectedDay;
     const duplicateStartEvent = events.find((event) => {
       if (event.date !== eventDate || event.id === editingEvent?.id) {
@@ -214,32 +214,34 @@ export default function App() {
 
     setEventFormError("");
 
-    if (editingEvent) {
-      setEvents((prev) =>
-        prev.map((item) => (item.id === editingEvent.id ? { ...item, ...draft } : item)),
-      );
-    } else {
-      setEvents((prev) => [
-        ...prev,
-        {
-          id: `evt-${Date.now()}`,
+    try {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, draft);
+      } else {
+        await createEvent({
           date: selectedDay,
           category: activeFilter === "all" ? "work" : activeFilter,
           ...draft,
-        },
-      ]);
-    }
+        });
+      }
 
-    closeFormSheet();
+      closeFormSheet();
+    } catch (saveError) {
+      setEventFormError(saveError instanceof Error ? saveError.message : "Unable to save event.");
+    }
   }
 
-  function deleteEvent(id: string) {
+  async function deleteEvent(id: string) {
     if (!window.confirm("Delete this event?")) {
       return;
     }
 
-    setEvents((prev) => prev.filter((item) => item.id !== id));
-    closeInfoSheet();
+    try {
+      await removeEvent(id);
+      closeInfoSheet();
+    } catch (deleteError) {
+      setEventFormError(deleteError instanceof Error ? deleteError.message : "Unable to delete event.");
+    }
   }
 
   function toggleHolidayDate(dateKey: string) {
@@ -256,54 +258,53 @@ export default function App() {
     });
   }
 
-  function saveHolidaySelection() {
+  async function saveHolidaySelection() {
     const year = visibleMonth.getFullYear();
     const month = visibleMonth.getMonth();
     const draftDates = Array.from(draftHolidayDates).sort();
-
-    setHolidays((prev) => {
-      const otherMonthHolidays = prev.filter((holiday) => {
-        const date = fromDateKey(holiday.date);
-        return date.getFullYear() !== year || date.getMonth() !== month;
-      });
-
-      const nextMonthHolidays = draftDates.map((dateKey) => {
-        const existing = prev.find((holiday) => holiday.date === dateKey);
-        return existing ?? { id: `hol-${dateKey}`, date: dateKey, title: "Holiday" };
-      });
-
-      return [...otherMonthHolidays, ...nextMonthHolidays];
+    const startDate = toDateKey(new Date(year, month, 1));
+    const endDate = toDateKey(new Date(year, month + 1, 0));
+    const nextMonthHolidays = draftDates.map((dateKey) => {
+      const existing = holidays.find((holiday) => holiday.date === dateKey);
+      return existing ?? { id: `hol-${dateKey}`, date: dateKey, title: "Holiday" };
     });
 
-    cancelHolidaySelection();
+    try {
+      await replaceHolidays(startDate, endDate, nextMonthHolidays);
+      cancelHolidaySelection();
+    } catch (holidayError) {
+      window.alert(holidayError instanceof Error ? holidayError.message : "Unable to save holidays.");
+    }
   }
 
-  function saveMoneyEntry(draft: MoneyDraft) {
-    if (editingMoneyEntry) {
-      setMoneyEntries((prev) =>
-        prev.map((entry) => (entry.id === editingMoneyEntry.id ? { ...entry, ...draft } : entry)),
-      );
-    } else {
-      setMoneyEntries((prev) => [
-        ...prev,
-        {
-          id: `money-${Date.now()}`,
+  async function saveMoneyEntry(draft: MoneyDraft) {
+    try {
+      if (editingMoneyEntry) {
+        await updateMoneyEntry(editingMoneyEntry.id, draft);
+      } else {
+        await createMoneyEntry({
           date: selectedDay,
           ...draft,
-        },
-      ]);
-    }
+        });
+      }
 
-    closeMoneyFormSheet();
+      closeMoneyFormSheet();
+    } catch (moneyError) {
+      window.alert(moneyError instanceof Error ? moneyError.message : "Unable to save money entry.");
+    }
   }
 
-  function deleteMoneyEntry(id: string) {
+  async function deleteMoneyEntry(id: string) {
     if (!window.confirm("Delete this money entry?")) {
       return;
     }
 
-    setMoneyEntries((prev) => prev.filter((entry) => entry.id !== id));
-    closeMoneyFormSheet();
+    try {
+      await removeMoneyEntry(id);
+      closeMoneyFormSheet();
+    } catch (moneyError) {
+      window.alert(moneyError instanceof Error ? moneyError.message : "Unable to delete money entry.");
+    }
   }
 
   function openEventDetail(event: CalendarEvent) {

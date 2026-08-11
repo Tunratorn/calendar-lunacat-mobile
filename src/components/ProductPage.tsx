@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Product } from "../types";
 import { Sheet } from "./Sheet";
 import { EditIcon, PlusIcon, TrashIcon } from "./icons";
-
-const STORAGE_KEY = "lunacat-products";
+import { lunacatApi } from "../lib/lunacatApi";
 
 const currencyFormatter = new Intl.NumberFormat("th-TH", {
   style: "currency",
@@ -11,70 +10,47 @@ const currencyFormatter = new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 0,
 });
 
-type StoredProduct = Partial<Product> & {
-  id?: string;
-  name?: string;
-  price?: number;
-};
-
 const numberFormatter = new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 0,
 });
-
-function normalizeAmount(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? Math.round(number) : 0;
-}
-
-function loadProducts(): Product[] {
-  const stored = localStorage.getItem(STORAGE_KEY);
-
-  if (!stored) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(stored) as StoredProduct[];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((product, index) => {
-        const salePrice = normalizeAmount(product.salePrice ?? product.price);
-
-        return {
-          id: product.id ?? `product-${index}`,
-          name: product.name?.trim() || "Untitled product",
-          costPrice: normalizeAmount(product.costPrice),
-          salePrice,
-          stock: normalizeAmount(product.stock),
-        };
-      })
-      .filter((product) => product.name);
-  } catch {
-    return [];
-  }
-}
 
 function formatMoney(value: number) {
   return currencyFormatter.format(value);
 }
 
 export function ProductPage() {
-  const [products, setProducts] = useState<Product[]>(loadProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [name, setName] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [stock, setStock] = useState("");
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-  }, [products]);
+    let active = true;
+
+    async function loadProducts() {
+      try {
+        setLoading(true);
+        const data = await lunacatApi.getProducts();
+        if (active) setProducts(data);
+      } catch (productError) {
+        if (active) setLoadError(productError instanceof Error ? productError.message : "Unable to load products");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadProducts();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const summary = useMemo(() => {
     return products.reduce(
@@ -99,7 +75,7 @@ export function ProductPage() {
 
   const marginPercent = summary.revenueValue > 0 ? Math.round((summary.profitValue / summary.revenueValue) * 100) : 0;
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
     const parsedCostPrice = Number(costPrice);
@@ -120,20 +96,25 @@ export function ProductPage() {
     }
 
     const nextProduct = {
-      id: editingProduct?.id ?? `product-${Date.now()}`,
       name: name.trim(),
       costPrice: Math.round(parsedCostPrice),
       salePrice: Math.round(parsedSalePrice),
       stock: Math.round(parsedStock),
     };
 
-    if (editingProduct) {
-      setProducts((prev) => prev.map((product) => (product.id === editingProduct.id ? nextProduct : product)));
-    } else {
-      setProducts((prev) => [...prev, nextProduct]);
-    }
+    try {
+      if (editingProduct) {
+        const updated = await lunacatApi.updateProduct(editingProduct.id, nextProduct);
+        setProducts((prev) => prev.map((product) => (product.id === editingProduct.id ? updated : product)));
+      } else {
+        const created = await lunacatApi.createProduct(nextProduct);
+        setProducts((prev) => [...prev, created]);
+      }
 
-    closeForm();
+      closeForm();
+    } catch (productError) {
+      setError(productError instanceof Error ? productError.message : "Unable to save product");
+    }
   }
 
   function closeForm() {
@@ -166,15 +147,20 @@ export function ProductPage() {
     setFormOpen(true);
   }
 
-  function deleteProduct(product: Product) {
+  async function deleteProduct(product: Product) {
     if (!window.confirm(`Delete ${product.name}?`)) {
       return;
     }
 
-    setProducts((prev) => prev.filter((item) => item.id !== product.id));
+    try {
+      await lunacatApi.deleteProduct(product.id);
+      setProducts((prev) => prev.filter((item) => item.id !== product.id));
 
-    if (editingProduct?.id === product.id) {
-      closeForm();
+      if (editingProduct?.id === product.id) {
+        closeForm();
+      }
+    } catch (productError) {
+      setError(productError instanceof Error ? productError.message : "Unable to delete product");
     }
   }
 
@@ -221,7 +207,16 @@ export function ProductPage() {
           </div>
         </div>
 
-        {products.length ? (
+        {loading ? (
+          <div className="rounded-2xl border border-dashed border-line bg-white/62 p-5">
+            <strong className="block text-[0.96rem] text-ink">Loading products</strong>
+          </div>
+        ) : loadError ? (
+          <div className="rounded-2xl border border-dashed border-line bg-white/62 p-5">
+            <strong className="block text-[0.96rem] text-[#b83f28]">Unable to load products</strong>
+            <span className="text-[0.86rem] leading-snug text-muted">{loadError}</span>
+          </div>
+        ) : products.length ? (
           <div className="grid gap-2">
             {products.map((product) => {
               const unitProfit = product.salePrice - product.costPrice;
