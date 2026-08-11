@@ -1,6 +1,7 @@
 import type { CalendarEvent, EventDraft, Holiday, MoneyDraft, MoneyEntry, Product } from "../types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "https://develop-api-production.up.railway.app/api").replace(/\/$/, "");
+const LUNACAT_USER_ID = import.meta.env.VITE_LUNACAT_USER_ID || "08e7c274-8d2a-43c2-8ade-71cee76add92";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -13,6 +14,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "x-lunacat-user-id": LUNACAT_USER_ID,
       ...options.headers,
     },
   });
