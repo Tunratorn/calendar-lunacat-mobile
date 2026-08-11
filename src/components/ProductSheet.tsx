@@ -138,7 +138,7 @@ export function ProductSheet({ open, onClose }: ProductSheetProps) {
       <form className="mb-4 grid gap-3 rounded-2xl bg-canvas p-3" onSubmit={handleSubmit}>
         <div className="grid gap-2">
           <label className="grid gap-1.5 text-[0.72rem] font-extrabold text-muted">
-            <span>Product</span>
+            <span>Name</span>
             <input
               type="text"
               value={name}

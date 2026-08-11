@@ -2,7 +2,7 @@ export type Category = "work" | "personal" | "focus";
 
 export type Filter = "all" | Category;
 
-export type View = "calendar" | "product" | "stats";
+export type View = "calendar" | "product";
 
 export interface CalendarEvent {
   id: string;

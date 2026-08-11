@@ -16,7 +16,6 @@ import { EventDetailSheet } from "./components/EventDetailSheet";
 import { MenuSheet } from "./components/MenuSheet";
 import { ProfileSheet } from "./components/ProfileSheet";
 import { ProductPage } from "./components/ProductPage";
-import { StatsSheet } from "./components/StatsSheet";
 import { HolidaySummary } from "./components/HolidaySummary";
 import { MoneySection } from "./components/MoneySection";
 import { MoneyFormSheet } from "./components/MoneyFormSheet";
@@ -24,7 +23,7 @@ import { RefreshIcon } from "./components/icons";
 
 const today = new Date();
 
-type InfoSheetKind = "menu" | "profile" | "stats" | "detail" | null;
+type InfoSheetKind = "menu" | "profile" | "detail" | null;
 
 export default function App() {
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -331,7 +330,7 @@ export default function App() {
   function openNavView(view: View) {
     setActiveView(view);
     setDetailEvent(null);
-    setInfoSheet(view === "stats" ? "stats" : null);
+    setInfoSheet(null);
     appShellRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
     if (view !== "calendar") {
@@ -343,7 +342,6 @@ export default function App() {
   const pageTitleByView: Record<View, string> = {
     calendar: "My Calendar",
     product: "Products",
-    stats: "Stats",
   };
 
   return (
@@ -466,7 +464,6 @@ export default function App() {
       />
 
       <ProfileSheet open={infoSheet === "profile"} onClose={closeInfoSheet} />
-      <StatsSheet open={infoSheet === "stats"} onClose={closeInfoSheet} />
     </main>
   );
 }

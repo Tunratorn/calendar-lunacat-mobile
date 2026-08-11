@@ -183,7 +183,6 @@ export function ProductPage() {
       <section aria-labelledby="product-title" className="px-5 pb-26 pt-2 animate-section-refresh">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
-            <p className="mb-0.5 text-xs font-bold uppercase text-muted">Product</p>
             <h2 id="product-title" className="text-xl font-semibold text-ink">
               Products
             </h2>
@@ -297,13 +296,13 @@ export function ProductPage() {
       <Sheet
         open={formOpen}
         onClose={closeForm}
-        kicker={editingProduct ? "Edit" : "Product"}
-        title={editingProduct ? "Edit product" : "Add product"}
+        kicker={editingProduct ? "Edit" : "New"}
+        title="Product"
         titleId="product-form-title"
       >
         <form className="grid gap-3" onSubmit={handleSubmit}>
           <label className="grid gap-1.5 text-[0.72rem] font-extrabold text-muted">
-            <span>Product</span>
+            <span>Name</span>
             <input
               type="text"
               value={name}

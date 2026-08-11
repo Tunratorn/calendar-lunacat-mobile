@@ -1,5 +1,5 @@
 import type { View } from "../types";
-import { CalendarNavIcon, ProductIcon, BarsIcon } from "./icons";
+import { CalendarNavIcon, ProductIcon } from "./icons";
 
 interface BottomNavProps {
   activeView: View;
@@ -9,7 +9,6 @@ interface BottomNavProps {
 const navItems: { view: View; label: string; icon: typeof CalendarNavIcon }[] = [
   { view: "calendar", label: "Calendar", icon: CalendarNavIcon },
   { view: "product", label: "Product", icon: ProductIcon },
-  { view: "stats", label: "Stats", icon: BarsIcon },
 ];
 
 export function BottomNav({ activeView, onSelectView }: BottomNavProps) {
@@ -24,10 +23,10 @@ export function BottomNav({ activeView, onSelectView }: BottomNavProps) {
           <button
             key={view}
             type="button"
-            aria-label={label === "Stats" ? "Insights" : label}
+            aria-label={label}
             onClick={() => onSelectView(view)}
             className={[
-              "flex min-h-13.5 w-[31%] flex-col items-center justify-center gap-0.5 rounded-2xl text-[0.7rem] font-extrabold transition hover:-translate-y-px active:translate-y-px active:scale-[0.98]",
+              "flex min-h-13.5 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl text-[0.7rem] font-extrabold transition hover:-translate-y-px active:translate-y-px active:scale-[0.98]",
               isActive ? "animate-soft-pop bg-[#e5efed] text-accent" : "bg-transparent text-muted",
             ].join(" ")}
           >
