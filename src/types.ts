@@ -52,5 +52,7 @@ export interface MoneyDraft {
 export interface Product {
   id: string;
   name: string;
-  price: number;
+  costPrice: number;
+  salePrice: number;
+  stock: number;
 }
