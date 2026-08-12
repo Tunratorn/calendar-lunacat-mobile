@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Sheet } from "./Sheet";
 import type { CalendarEvent, EventDraft } from "../types";
 
@@ -11,10 +12,10 @@ interface EventFormSheetProps {
 }
 
 const defaultDraft: EventDraft = {
-  title: "Planning session",
-  start: "16:30",
-  end: "17:15",
-  note: "Discuss next sprint",
+  title: "",
+  start: "00:00",
+  end: "00:00",
+  note: "",
 };
 
 const inputClass = "min-h-11.5 w-full rounded-lg border border-line bg-canvas px-3 text-ink";
@@ -35,10 +36,111 @@ function updateTime(time: string, part: "hour" | "minute", value: string) {
   return part === "hour" ? `${value}:${minute}` : `${hour}:${value}`;
 }
 
+interface TimePickerModalProps {
+  field: "start" | "end";
+  label: string;
+  value: string;
+  onChangePart: (field: "start" | "end", part: "hour" | "minute", value: string) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+function TimePickerModal({ field, label, value, onChangePart, onConfirm, onClose }: TimePickerModalProps) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-ink/36 px-5 py-5 animate-backdrop-in max-[460px]:px-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${field}-time-picker-title`}
+        className="grid h-[min(72dvh,440px)] max-h-[calc(100dvh-2rem)] w-full max-w-[340px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden rounded-[20px] bg-surface p-3.5 shadow-[0_18px_55px_rgba(22,32,51,0.22)]"
+        data-time-picker
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="mb-0.5 text-[0.7rem] font-black uppercase text-muted">{label}</p>
+            <h3 id={`${field}-time-picker-title`} className="text-lg font-black leading-tight text-ink">
+              {value}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-8.5 rounded-lg border-0 bg-surface-strong px-3 text-[0.74rem] font-black text-ink transition active:scale-[0.98]"
+          >
+            Done
+          </button>
+        </div>
+        <div className="grid min-h-0 grid-cols-2 gap-2.5">
+          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+            <span className="text-center text-[0.64rem] font-black uppercase text-subtle">Hour</span>
+            <div className="grid min-h-0 content-start gap-1 overflow-y-auto overscroll-contain rounded-lg bg-canvas p-1">
+              {hourOptions.map((hour) => {
+                const selected = getTimePart(value, "hour") === hour;
+
+                return (
+                  <button
+                    key={hour}
+                    type="button"
+                    onClick={() => onChangePart(field, "hour", hour)}
+                    className={[
+                      "min-h-8 rounded-md text-[0.78rem] font-black transition active:scale-[0.98]",
+                      selected ? "bg-accent text-accent-ink" : "bg-surface text-ink",
+                    ].join(" ")}
+                  >
+                    {hour}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+            <span className="text-center text-[0.64rem] font-black uppercase text-subtle">Minute</span>
+            <div className="grid min-h-0 content-start gap-1 overflow-y-auto overscroll-contain rounded-lg bg-canvas p-1">
+              {minuteOptions.map((minute) => {
+                const selected = getTimePart(value, "minute") === minute;
+
+                return (
+                  <button
+                    key={minute}
+                    type="button"
+                    onClick={() => onChangePart(field, "minute", minute)}
+                    className={[
+                      "min-h-8 rounded-md text-[0.78rem] font-black transition active:scale-[0.98]",
+                      selected ? "bg-accent text-accent-ink" : "bg-surface text-ink",
+                    ].join(" ")}
+                  >
+                    {minute}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="min-h-10 rounded-xl border-0 bg-accent text-[0.84rem] font-black text-accent-ink transition active:scale-[0.98]"
+        >
+          Select time
+        </button>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
 export function EventFormSheet({ open, editingEvent, submitError, onClose, onSave }: EventFormSheetProps) {
   const [draft, setDraft] = useState<EventDraft>(defaultDraft);
   const [localError, setLocalError] = useState("");
   const [activeTimePicker, setActiveTimePicker] = useState<"start" | "end" | null>(null);
+  const [selectedTimes, setSelectedTimes] = useState({ start: false, end: false });
 
   useEffect(() => {
     if (!open) {
@@ -47,6 +149,7 @@ export function EventFormSheet({ open, editingEvent, submitError, onClose, onSav
 
     setLocalError("");
     setActiveTimePicker(null);
+    setSelectedTimes({ start: Boolean(editingEvent), end: Boolean(editingEvent) });
     setDraft(
       editingEvent
         ? { title: editingEvent.title, start: editingEvent.start, end: editingEvent.end, note: editingEvent.note }
@@ -59,22 +162,17 @@ export function EventFormSheet({ open, editingEvent, submitError, onClose, onSav
       return;
     }
 
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target;
-
-      if (!(target instanceof Element)) {
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
         return;
       }
 
-      if (target.closest("[data-time-picker]")) {
-        return;
-      }
-
+      event.stopPropagation();
       setActiveTimePicker(null);
     }
 
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeydown, { capture: true });
+    return () => document.removeEventListener("keydown", handleKeydown, { capture: true });
   }, [activeTimePicker]);
 
   const isEditing = Boolean(editingEvent);
@@ -82,18 +180,36 @@ export function EventFormSheet({ open, editingEvent, submitError, onClose, onSav
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
-    if (draft.start >= draft.end) {
+    if (!draft.title.trim()) {
+      setLocalError("Title is required.");
+      return;
+    }
+
+    if (!selectedTimes.start || !selectedTimes.end) {
+      setLocalError("Start time and end time are required.");
+      return;
+    }
+
+    const trimmedDraft = { ...draft, title: draft.title.trim(), note: draft.note.trim() };
+
+    if (trimmedDraft.start >= trimmedDraft.end) {
       setLocalError("End time must be later than start time.");
       return;
     }
 
     setLocalError("");
     setActiveTimePicker(null);
-    onSave(draft);
+    onSave(trimmedDraft);
   }
 
   function setTimePart(field: "start" | "end", part: "hour" | "minute", value: string) {
     setDraft((prev) => ({ ...prev, [field]: updateTime(prev[field], part, value) }));
+    setSelectedTimes((prev) => ({ ...prev, [field]: true }));
+  }
+
+  function confirmTime(field: "start" | "end") {
+    setSelectedTimes((prev) => ({ ...prev, [field]: true }));
+    setActiveTimePicker(null);
   }
 
   function renderTimePicker(field: "start" | "end", label: string) {
@@ -107,65 +223,10 @@ export function EventFormSheet({ open, editingEvent, submitError, onClose, onSav
           type="button"
           aria-expanded={active}
           onClick={() => setActiveTimePicker((prev) => (prev === field ? null : field))}
-          className={timeButtonClass}
+          className={[timeButtonClass, selectedTimes[field] ? "text-ink" : "text-subtle"].join(" ")}
         >
           {value}
         </button>
-        {active && (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-2xl border border-line bg-surface p-2 shadow-[0_18px_42px_rgba(22,32,51,0.18)]">
-            <div className="mb-2 grid grid-cols-2 gap-2 px-1 text-center text-[0.64rem] font-black uppercase text-subtle">
-              <span>Hour</span>
-              <span>Minute</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="grid max-h-38 gap-1 overflow-y-auto pr-1">
-                {hourOptions.map((hour) => {
-                  const selected = getTimePart(value, "hour") === hour;
-
-                  return (
-                    <button
-                      key={hour}
-                      type="button"
-                      onClick={() => setTimePart(field, "hour", hour)}
-                      className={[
-                        "min-h-8 rounded-lg text-[0.78rem] font-black transition active:scale-[0.98]",
-                        selected ? "bg-accent text-accent-ink" : "bg-canvas text-ink",
-                      ].join(" ")}
-                    >
-                      {hour}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="grid max-h-38 gap-1 overflow-y-auto pl-1">
-                {minuteOptions.map((minute) => {
-                  const selected = getTimePart(value, "minute") === minute;
-
-                  return (
-                    <button
-                      key={minute}
-                      type="button"
-                      onClick={() => setTimePart(field, "minute", minute)}
-                      className={[
-                        "min-h-8 rounded-lg text-[0.78rem] font-black transition active:scale-[0.98]",
-                        selected ? "bg-accent text-accent-ink" : "bg-canvas text-ink",
-                      ].join(" ")}
-                    >
-                      {minute}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveTimePicker(null)}
-              className="mt-2 min-h-8 w-full rounded-lg border-0 bg-surface-strong text-[0.72rem] font-black text-ink transition active:scale-[0.98]"
-            >
-              Done
-            </button>
-          </div>
-        )}
       </div>
     );
   }
@@ -214,6 +275,16 @@ export function EventFormSheet({ open, editingEvent, submitError, onClose, onSav
           {isEditing ? "Update event" : "Save event"}
         </button>
       </form>
+      {activeTimePicker && (
+        <TimePickerModal
+          field={activeTimePicker}
+          label={activeTimePicker === "start" ? "Start time" : "End time"}
+          value={draft[activeTimePicker]}
+          onChangePart={setTimePart}
+          onConfirm={() => confirmTime(activeTimePicker)}
+          onClose={() => setActiveTimePicker(null)}
+        />
+      )}
     </Sheet>
   );
 }

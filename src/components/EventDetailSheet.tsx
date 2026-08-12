@@ -31,20 +31,6 @@ export function EventDetailSheet({ open, event, onClose, onEdit, onDelete }: Eve
           </span>
           <p className="mb-0 text-[0.84rem] text-muted">{event.note || "No notes"}</p>
         </div>
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3">
-            <span className="text-[0.84rem] text-muted">Calendar</span>
-            <strong className="text-ink">{event.category}</strong>
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3">
-            <span className="text-[0.84rem] text-muted">Status</span>
-            <strong className="text-ink">Confirmed</strong>
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-canvas px-4 py-3">
-            <span className="text-[0.84rem] text-muted">Reminder</span>
-            <strong className="text-ink">15 minutes before</strong>
-          </div>
-        </div>
         <div className="flex gap-3">
           <button
             type="button"
